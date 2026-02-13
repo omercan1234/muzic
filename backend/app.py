@@ -7,6 +7,8 @@ import requests
 app = Flask(__name__)
 CORS(app)
 
+PUBLIC_URL = "https://muzic-production-a4ca.up.railway.app"
+
 ydl_opts = {
     'format': 'bestaudio/best',
     'quiet': True,
@@ -21,45 +23,40 @@ def home():
 @app.route('/api/music/<video_id>', methods=['GET'])
 def get_music_stream(video_id):
     try:
+        # Proxy URL oluştur (Bu sayede 403 hatası almayacaksın)
+        proxy_url = f"{PUBLIC_URL}/api/listen/{video_id}"
+
+        # Sadece meta verileri çek
         url = f'https://www.youtube.com/watch?v={video_id}'
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
-            if 'url' in info:
-                return jsonify({
-                    'success': True,
-                    'stream_url': info['url'],
-                    'title': info.get('title', 'Unknown'),
-                    'duration': info.get('duration', 0),
-                    'view_count': info.get('view_count', 0),
-                    'like_count': info.get('like_count', 0),
-                }), 200
-            return jsonify({'error': 'No URL'}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/lyrics/<video_id>', methods=['GET'])
-def get_lyrics(video_id):
-    try:
-        url = f'https://www.youtube.com/watch?v={video_id}'
-        # Şarkı sözlerini (altyazıları) çekmeye çalış
-        ydl_lyrics_opts = {
-            'skip_download': True,
-            'writesubtitles': True,
-            'writeautomaticsub': True,
-            'subtitleslangs': ['tr', 'en'],
-            'quiet': True,
-        }
-        with yt_dlp.YoutubeDL(ydl_lyrics_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            # Burada basitleştirilmiş bir mantık var, gerçek şarkı sözü API'leri daha karmaşıktır
             return jsonify({
                 'success': True,
-                'lyrics': "Şarkı sözleri YouTube altyazılarından çekilecek...",
-                'subtitles': info.get('subtitles', {}),
-                'automatic_captions': info.get('automatic_captions', {})
+                'stream_url': proxy_url, # Kendi sunucumuz üzerinden dinleteceğiz
+                'title': info.get('title', 'Unknown'),
+                'duration': info.get('duration', 0),
             }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/listen/<video_id>')
+def listen(video_id):
+    """Müziği YouTube'dan alıp telefona tüneller (403 hatasını çözer)"""
+    try:
+        url = f'https://www.youtube.com/watch?v={video_id}'
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            stream_url = info['url']
+
+            # YouTube stream'ini indir ve anlık olarak telefona gönder
+            req = requests.get(stream_url, stream=True, headers={'User-Agent': 'Mozilla/5.0'})
+
+            return Response(
+                stream_with_context(req.iter_content(chunk_size=1024*10)),
+                content_type=req.headers.get('content-type', 'audio/mpeg')
+            )
+    except Exception as e:
+        return str(e), 500
 
 @app.route('/api/search', methods=['POST'])
 def search():
@@ -83,5 +80,5 @@ def search():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)
