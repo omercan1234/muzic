@@ -9,18 +9,20 @@ CORS(app)
 
 PUBLIC_URL = "https://muzic-production-a4ca.up.railway.app"
 
-# YouTube kısıtlamalarını aşmak için başlıklar
-CHROME_HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+# Gerçek bir tarayıcı gibi davranmak için gerekli başlıklar
+BROWSER_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    'Accept': '*/*',
+    'Accept-Language': 'en-US,en;q=0.9',
     'Referer': 'https://www.youtube.com/',
-    'Origin': 'https://www.youtube.com/'
+    'Origin': 'https://www.youtube.com/',
 }
 
 ydl_opts = {
     'format': 'bestaudio/best',
     'quiet': True,
     'no_warnings': True,
-    'socket_timeout': 30,
+    'nocheckcertificate': True,
 }
 
 @app.route('/')
@@ -45,23 +47,25 @@ def get_music_stream(video_id):
 
 @app.route('/api/listen/<video_id>')
 def listen(video_id):
-    """Müziği YouTube'dan alıp telefona tüneller (Headers eklenerek 403 çözüldü)"""
+    """Müziği YouTube'dan alıp telefona tüneller (403 bypass)"""
     try:
         url = f'https://www.youtube.com/watch?v={video_id}'
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             stream_url = info['url']
 
-            # YouTube stream'ini indir ve anlık olarak telefona gönder
-            # Headers eklendi: 403 engeli için kritik
-            req = requests.get(stream_url, stream=True, headers=CHROME_HEADERS, timeout=30)
+            # YouTube'dan veriyi gerçek tarayıcı başlıklarıyla iste
+            resp = requests.get(stream_url, stream=True, headers=BROWSER_HEADERS, timeout=30)
 
-            # Sunucudan gelen stream'i doğrudan aktar
+            def generate():
+                for chunk in resp.iter_content(chunk_size=1024*32):
+                    yield chunk
+
             return Response(
-                stream_with_context(req.iter_content(chunk_size=1024*16)),
-                content_type=req.headers.get('content-type', 'audio/mpeg'),
+                stream_with_context(generate()),
+                content_type=resp.headers.get('Content-Type', 'audio/mpeg'),
                 headers={
-                    'Accept-Ranges': 'bytes',
+                    'Access-Control-Allow-Origin': '*',
                     'Cache-Control': 'no-cache',
                 }
             )
