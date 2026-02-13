@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "889787544189",
+    "project_id": "muzic-2b00e",
+    "storage_bucket": "muzic-2b00e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:889787544189:android:b4c93e3f3a87cc7df2f714",
+        "android_client_info": {
+          "package_name": "com.example.muzik"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "889787544189-lf6omiekcs6m85ptb7mq3ttft03l9ktp.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.muzik",
+            "certificate_hash": "7157f21687b64c59bb543228b36b52ff62ff9df2"
+          }
+        },
+        {
+          "client_id": "889787544189-778d7hd4v08roro42ih4lh4ie3rg21cc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC6QFF7JGHBym21RBMA5p9_O2njq2Xtbmc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "889787544189-778d7hd4v08roro42ih4lh4ie3rg21cc.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "889787544189-fnbvb923mratqafurqedq06utl517v99.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.muzik"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

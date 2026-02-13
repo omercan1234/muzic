@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- 🎨 SPOTIFY TARZI PAYLAŞIM KARTI -->
+  <!-- Bu etiketler Discord ve WhatsApp'ta görünecek olan kısımdır -->
+  <meta property="og:type" content="music.song" />
+  <meta property="og:title" content="Muzik App ile Dinle" />
+  <meta property="og:description" content="Harika bir şarkı keşfettim, seninle paylaşmak istedim! 🎧" />
+  <meta property="og:image" content="https://firebasestorage.googleapis.com/v0/b/muzic-2b00e.appspot.com/o/app_share_card.png?alt=media" />
+  <meta property="og:url" content="https://muzic-2b00e.web.app" />
+
+  <!-- 🔗 OTOMATİK UYGULAMAYA YÖNLENDİRME -->
+  <script>
+    // URL'den şarkı ID'sini al (Örn: song.html?id=123)
+    const urlParams = new URLSearchParams(window.location.search);
+    const songId = urlParams.get('id');
+
+    if (songId) {
+      // Eğer telefon ise uygulamayı açmaya çalış
+      window.location.href = "muzikapp://music/" + songId;
+
+      // 3 saniye sonra hala buradaysa (uygulama yüklü değilse) Play Store'a at
+      setTimeout(function() {
+        window.location.href = "https://play.google.com/store/apps/details?id=com.omerk.muzik";
+      }, 3000);
+    }
+  </script>
+
+  <style>
+    body { background-color: #121212; color: white; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; text-align: center; }
+    .loader { border: 4px solid #f3f3f3; border-top: 4px solid #1DB954; border-radius: 50%; width: 40px; height: 40px; animation: spin 2s linear infinite; margin-bottom: 20px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div>
+    <div class="loader"></div>
+    <h2>Uygulamaya Yönlendiriliyorsunuz...</h2>
+    <p>Eğer uygulama açılmazsa Play Store'a yönlendirileceksiniz.</p>
+  </div>
+</body>
+</html>

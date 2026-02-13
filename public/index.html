@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <title>Muzik App Paylaşımı</title>
+
+  <!-- 🎨 Spotify Benzeri Paylaşım Kartı (Open Graph) -->
+  <!-- ÖNEMLİ: Bu resim, Discord'da görünecek olan kart resmidir -->
+  <meta property="og:title" content="Bu şarkıyı Muzik App'te Dinle 🎵" />
+  <meta property="og:description" content="Harika bir şarkı keşfettim, hemen uygulamada aç!" />
+  <meta property="og:image" content="https://muzic-2b00e.web.app/app_card.png" />
+  <meta property="og:type" content="music.song" />
+  <meta property="og:url" content="https://muzic-2b00e.web.app/" />
+
+  <!-- 🔗 Deep Link Ayarları -->
+  <meta property="al:android:url" content="muzikapp://music" />
+  <meta property="al:android:package" content="com.example.muzik" />
+  <meta property="al:android:app_name" content="Muzik App" />
+
+  <script>
+    // URL'den id'yi alıyoruz: ?id=xxxx
+    const params = new URLSearchParams(location.search);
+    const id = params.get("id") || "";
+
+    // Uygulamayı tetikleyen Deep Link
+    const deepLink = "muzikapp://music?id=" + id;
+
+    // Eğer uygulama yüklü değilse verilecek uyarı
+    setTimeout(() => {
+      alert("Uygulama yüklü değil. (Play Store'da yayınlanınca buraya yönlenecek)");
+    }, 1200);
+
+    // Uygulamayı açmaya çalış
+    window.location.href = deepLink;
+  </script>
+
+  <style>
+    body { background-color: #121212; color: white; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; text-align: center; }
+    .loader { border: 5px solid #282828; border-top: 5px solid #1DB954; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div>
+    <div class="loader"></div>
+    <h2 style="margin:0">Uygulama açılıyor...</h2>
+    <p style="color: #b3b3b3">Muzik App yüklü değilse uyarı alacaksınız.</p>
+  </div>
+</body>
+</html>
