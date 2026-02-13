@@ -9,6 +9,13 @@ CORS(app)
 
 PUBLIC_URL = "https://muzic-production-a4ca.up.railway.app"
 
+# YouTube kısıtlamalarını aşmak için başlıklar
+CHROME_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Referer': 'https://www.youtube.com/',
+    'Origin': 'https://www.youtube.com/'
+}
+
 ydl_opts = {
     'format': 'bestaudio/best',
     'quiet': True,
@@ -23,16 +30,13 @@ def home():
 @app.route('/api/music/<video_id>', methods=['GET'])
 def get_music_stream(video_id):
     try:
-        # Proxy URL oluştur (Bu sayede 403 hatası almayacaksın)
         proxy_url = f"{PUBLIC_URL}/api/listen/{video_id}"
-
-        # Sadece meta verileri çek
         url = f'https://www.youtube.com/watch?v={video_id}'
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             return jsonify({
                 'success': True,
-                'stream_url': proxy_url, # Kendi sunucumuz üzerinden dinleteceğiz
+                'stream_url': proxy_url,
                 'title': info.get('title', 'Unknown'),
                 'duration': info.get('duration', 0),
             }), 200
@@ -41,7 +45,7 @@ def get_music_stream(video_id):
 
 @app.route('/api/listen/<video_id>')
 def listen(video_id):
-    """Müziği YouTube'dan alıp telefona tüneller (403 hatasını çözer)"""
+    """Müziği YouTube'dan alıp telefona tüneller (Headers eklenerek 403 çözüldü)"""
     try:
         url = f'https://www.youtube.com/watch?v={video_id}'
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -49,11 +53,17 @@ def listen(video_id):
             stream_url = info['url']
 
             # YouTube stream'ini indir ve anlık olarak telefona gönder
-            req = requests.get(stream_url, stream=True, headers={'User-Agent': 'Mozilla/5.0'})
+            # Headers eklendi: 403 engeli için kritik
+            req = requests.get(stream_url, stream=True, headers=CHROME_HEADERS, timeout=30)
 
+            # Sunucudan gelen stream'i doğrudan aktar
             return Response(
-                stream_with_context(req.iter_content(chunk_size=1024*10)),
-                content_type=req.headers.get('content-type', 'audio/mpeg')
+                stream_with_context(req.iter_content(chunk_size=1024*16)),
+                content_type=req.headers.get('content-type', 'audio/mpeg'),
+                headers={
+                    'Accept-Ranges': 'bytes',
+                    'Cache-Control': 'no-cache',
+                }
             )
     except Exception as e:
         return str(e), 500
