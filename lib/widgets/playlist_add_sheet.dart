@@ -35,7 +35,7 @@ class _PlaylistAddSheetState extends State<PlaylistAddSheet> {
         .where((p) => widget.playerController.isInPlaylist(p.id, widget.currentMusic))
         .map((p) => p.id)
         .toSet();
-    
+
     // ✅ BURASI DÜZELTİLDİ: Fonksiyon olarak çağırıldı
     _initialIsLiked = widget.playerController.isCurrentLiked(widget.currentMusic.youtubeId);
   }

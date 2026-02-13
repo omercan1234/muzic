@@ -23,6 +23,7 @@ class PlayerController extends ChangeNotifier {
   double musicVolume = 100;
 
   String? get currentUserUid => _auth.currentUser?.uid;
+  AudioHandler get audioHandler => _audioHandler;
 
   final List<Music> likedMusicsList = []; 
   final List<model.Playlist> userPlaylists = [];
@@ -34,6 +35,8 @@ class PlayerController extends ChangeNotifier {
     
     _audioHandler.playbackState.listen((state) {
       isPlaying = state.playing;
+      isPlayerReady = state.processingState != AudioProcessingState.loading && 
+                      state.processingState != AudioProcessingState.buffering;
       notifyListeners();
     });
 
@@ -102,7 +105,8 @@ class PlayerController extends ChangeNotifier {
   void toggleShuffle() { if (!_canControlMusic()) return; isShuffle = !isShuffle; notifyListeners(); }
   void toggleRepeat() { if (!_canControlMusic()) return; isRepeat = !isRepeat; notifyListeners(); }
 
-  // --- Beğeni ve Playlist Metodları (Undefined Hatalarını Çözer) ---
+  // --- Playlist ve Beğeni Metodları ---
+
   bool isCurrentLiked(String youtubeId) {
     return likedMusicsList.any((m) => m.youtubeId == youtubeId);
   }
@@ -127,8 +131,40 @@ class PlayerController extends ChangeNotifier {
   void toggleMusicInPlaylist(String playlistId, Music music) {
     final p = userPlaylists.firstWhere((p) => p.id == playlistId);
     final exists = p.musics.any((m) => m.youtubeId == music.youtubeId);
-    exists ? p.musics.removeWhere((m) => m.youtubeId == music.youtubeId) : p.musics.add(music);
+    if (exists) {
+      p.musics.removeWhere((m) => m.youtubeId == music.youtubeId);
+    } else {
+      p.musics.add(music);
+    }
     p.lastUpdatedAt = DateTime.now();
+    _saveDataToFirebase();
+    notifyListeners();
+  }
+
+  void createPlaylist(String name) {
+    userPlaylists.add(model.Playlist(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      name: name,
+      image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=2070&auto=format&fit=crop',
+      ownerName: userName,
+      ownerImage: userProfileImage,
+      createdAt: DateTime.now(),
+      lastUpdatedAt: DateTime.now(),
+    ));
+    _saveDataToFirebase();
+    notifyListeners();
+  }
+
+  void deletePlaylist(String playlistId) {
+    userPlaylists.removeWhere((p) => p.id == playlistId);
+    _saveDataToFirebase();
+    notifyListeners();
+  }
+
+  void removeMusicFromPlaylist(String playlistId, String youtubeId) {
+    final playlist = userPlaylists.firstWhere((p) => p.id == playlistId);
+    playlist.musics.removeWhere((m) => m.youtubeId == youtubeId);
+    playlist.lastUpdatedAt = DateTime.now();
     _saveDataToFirebase();
     notifyListeners();
   }
@@ -140,6 +176,7 @@ class PlayerController extends ChangeNotifier {
         target.musics.add(music);
       }
     }
+    target.lastUpdatedAt = DateTime.now();
     _saveDataToFirebase();
     notifyListeners();
   }
@@ -154,31 +191,6 @@ class PlayerController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void removeMusicFromPlaylist(String playlistId, String youtubeId) {
-    final playlist = userPlaylists.firstWhere((p) => p.id == playlistId);
-    playlist.musics.removeWhere((m) => m.youtubeId == youtubeId);
-    _saveDataToFirebase();
-    notifyListeners();
-  }
-
-  void createPlaylist(String name) {
-    userPlaylists.add(model.Playlist(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: name,
-      image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?q=80&w=2070&auto=format&fit=crop',
-      ownerName: userName,
-      ownerImage: userProfileImage
-    ));
-    _saveDataToFirebase();
-    notifyListeners();
-  }
-
-  void deletePlaylist(String playlistId) {
-    userPlaylists.removeWhere((p) => p.id == playlistId);
-    _saveDataToFirebase();
-    notifyListeners();
-  }
-
   void updatePlaylistDetails(String id, String newName, String newDesc, String newImage, bool isPrivate) {
     final index = userPlaylists.indexWhere((p) => p.id == id);
     if (index != -1) {
@@ -186,6 +198,7 @@ class PlayerController extends ChangeNotifier {
       userPlaylists[index].description = newDesc;
       userPlaylists[index].image = newImage;
       userPlaylists[index].isPrivate = isPrivate;
+      userPlaylists[index].lastUpdatedAt = DateTime.now();
       _saveDataToFirebase();
       notifyListeners();
     }
@@ -195,13 +208,17 @@ class PlayerController extends ChangeNotifier {
     final index = userPlaylists.indexWhere((p) => p.id == playlistId);
     if (index != -1) {
       userPlaylists[index].showOnProfile = !userPlaylists[index].showOnProfile;
+      userPlaylists[index].lastUpdatedAt = DateTime.now();
       _saveDataToFirebase();
       notifyListeners();
     }
   }
 
-  // --- Profil ve Veri Metodları ---
-  Future<void> refreshData() async { await _loadDataFromFirebase(); }
+  // --- Profil ve Yardımcı Metodlar ---
+
+  Future<void> refreshData() async {
+    await _loadDataFromFirebase();
+  }
 
   Future<bool> isProfileComplete() async {
     final user = _auth.currentUser;
@@ -223,7 +240,8 @@ class PlayerController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // --- YouTube Yükleme Mantığı (Retry + 5 Altın Kural) ---
+  // --- Yükleme ve Renk Yönetimi ---
+
   Future<void> _loadAndPlay(Music music, {bool autoPlay = true}) async {
     int retryCount = 0;
     const int maxRetries = 3;
@@ -231,20 +249,12 @@ class PlayerController extends ChangeNotifier {
 
     while (retryCount < maxRetries && !success) {
       try {
-        print('📥 Müzik yükleniyor: ${music.name} (Deneme ${retryCount + 1}/$maxRetries)');
-        
-        // Backend'den stream URL'sini al (yt-dlp signature'ı halledecek)
         final streamUrl = await _musicService.getAudioStreamUrl(music.youtubeId);
-        
-        if (streamUrl == null || streamUrl.isEmpty) {
-          throw Exception("Backend'den URL alınamadı");
-        }
-
-        print('🔗 Stream URL alındı: ${streamUrl.substring(0, 60)}...');
+        if (streamUrl == null || streamUrl.isEmpty) throw Exception("No URL");
 
         final item = MediaItem(
           id: music.youtubeId,
-          album: "YouTube",
+          album: music.desc,
           title: music.name,
           artist: music.desc,
           artUri: music.image.isNotEmpty ? Uri.parse(music.image) : null,
@@ -252,25 +262,13 @@ class PlayerController extends ChangeNotifier {
 
         final handler = _audioHandler as MyAudioHandler;
         await handler.setAudioSource(streamUrl, item);
-
         if (autoPlay) await _audioHandler.play();
         success = true;
-        print('✅ Müzik çalmaya başladı: ${music.name}');
       } catch (e) {
         retryCount++;
-        print('⚠️ Deneme $retryCount başarısız: $e');
-        if (retryCount < maxRetries) {
-          final delayMs = 1000 * retryCount;
-          print('🔄 ${delayMs}ms sonra yeniden deneyelim...');
-          await Future.delayed(Duration(milliseconds: delayMs));
-        }
+        if (retryCount < maxRetries) await Future.delayed(Duration(milliseconds: 500));
       }
     }
-    
-    if (!success) {
-      print('❌ BAŞARISIZ: ${music.name} oynatılamadı (backend hatası)');
-    }
-    
     isPlayerReady = true;
     notifyListeners();
   }
@@ -278,19 +276,12 @@ class PlayerController extends ChangeNotifier {
   Future<void> _updateDominantColor(String imageUrl) async {
     if (imageUrl.isEmpty) return;
     try {
-      final palette = await PaletteGenerator.fromImageProvider(
-        NetworkImage(imageUrl),
-        maximumColorCount: 10,
-      ).timeout(const Duration(seconds: 2));
+      final palette = await PaletteGenerator.fromImageProvider(NetworkImage(imageUrl));
       dominantColor = palette.vibrantColor?.color ?? palette.dominantColor?.color ?? Colors.blueGrey[900];
       notifyListeners();
-    } catch (e) {
-      dominantColor = Colors.blueGrey[900];
-      notifyListeners();
-    }
+    } catch (e) {}
   }
 
-  // --- Firebase Kayıt/Yükleme ---
   Future<void> _loadDataFromFirebase() async {
     final user = _auth.currentUser; if (user == null) return;
     try {

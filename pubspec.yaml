@@ -24,9 +24,6 @@ dependencies:
   firebase_auth: ^6.1.4
   cloud_firestore: ^6.1.2
   firebase_storage: ^13.0.6 
-  # Downgrade to a version compatible with the existing usage in
-  # lib/services/auth_service.dart (unnamed constructor, .signIn(),
-  # and accessToken/idToken properties).
   google_sign_in: ^5.4.0
   http: ^1.2.0
   image_picker: ^1.0.7
@@ -36,11 +33,13 @@ dependencies:
   just_audio: ^0.10.5
   audio_service: ^0.18.15
   audio_session: ^0.2.2
+  audio_video_progress_bar: ^2.0.1
+  rxdart: ^0.27.7
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^6.0.0
+  flutter_lints: ^2.0.0
 
 flutter:
   uses-material-design: true

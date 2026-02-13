@@ -36,7 +36,7 @@ class MusicService {
           'User-Agent': 'MuzikApp/1.0',
         },
       ).timeout(
-        const Duration(seconds: 40), // Railway için süreyi optimize ettik
+        const Duration(seconds: 40),
         onTimeout: () {
           print('⏰ Zaman Aşımı: Railway sunucusu yanıt vermedi.');
           throw Exception('Backend bağlantı zaman aşımı (40s)');
@@ -65,6 +65,25 @@ class MusicService {
       }
     } catch (e) {
       print('❌ Hata: $e');
+      return null;
+    }
+  }
+
+  /// Şarkı sözlerini backend'den al
+  Future<String?> getLyrics(String videoId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$backendUrl/api/lyrics/$videoId'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['lyrics'] as String?;
+      }
+      return null;
+    } catch (e) {
+      print('❌ Şarkı sözü alınamadı: $e');
       return null;
     }
   }
