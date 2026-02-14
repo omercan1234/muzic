@@ -28,6 +28,9 @@ class PlayerController extends ChangeNotifier {
   final List<Music> likedMusicsList = []; 
   final List<model.Playlist> userPlaylists = [];
 
+  // Mevcut yükleme işlemini takip etmek için
+  String? _loadingVideoId;
+
   PlayerController() {
     _auth.authStateChanges().listen((user) {
       if (user != null) { _loadDataFromFirebase(); } else { _clearLocalData(); }
@@ -42,9 +45,12 @@ class PlayerController extends ChangeNotifier {
 
     _audioHandler.mediaItem.listen((item) {
       if (item != null) {
-        _currentMusic = Music.fromMediaItem(item);
-        _updateDominantColor(_currentMusic!.image);
-        notifyListeners();
+        // Sadece gerçekten değiştiyse güncelle
+        if (_currentMusic?.youtubeId != item.id) {
+          _currentMusic = Music.fromMediaItem(item);
+          _updateDominantColor(_currentMusic!.image);
+          notifyListeners();
+        }
       }
     });
   }
@@ -57,13 +63,21 @@ class PlayerController extends ChangeNotifier {
   bool isShuffle = false; bool isRepeat = false; bool showHeartExplosion = false;
 
   // --- Oynatma Metodları ---
-  void onMusicSelect(Music music, {List<Music>? playlist, int? index}) {
+  void onMusicSelect(Music music, {List<Music>? playlist, int? index}) async {
     if (!_canControlMusic()) return;
+
+    // Eğer zaten aynı şarkı çalıyorsa tekrar yükleme (Opsiyonel: Eğer istersen bunu kaldırabilirsin)
+    if (_currentMusic?.youtubeId == music.youtubeId && isPlaying) return;
+
     currentPlaylist = playlist ?? [music];
     currentIndex = index ?? 0;
     _currentMusic = music;
-    isPlayerReady = false;
+    isPlayerReady = false; 
+    _loadingVideoId = music.youtubeId; // Şu an bu ID yükleniyor
     notifyListeners();
+
+    // Önce mevcut çalmayı durdur (Temiz geçiş için)
+    await _audioHandler.stop();
 
     _loadAndPlay(music);
     _updateJamStateIfNeeded(music);
@@ -105,7 +119,7 @@ class PlayerController extends ChangeNotifier {
   void toggleShuffle() { if (!_canControlMusic()) return; isShuffle = !isShuffle; notifyListeners(); }
   void toggleRepeat() { if (!_canControlMusic()) return; isRepeat = !isRepeat; notifyListeners(); }
 
-  // --- Playlist ve Beğeni Metodları ---
+  // --- Eksik Metodlar ---
 
   bool isCurrentLiked(String youtubeId) {
     return likedMusicsList.any((m) => m.youtubeId == youtubeId);
@@ -214,8 +228,6 @@ class PlayerController extends ChangeNotifier {
     }
   }
 
-  // --- Profil ve Yardımcı Metodlar ---
-
   Future<void> refreshData() async {
     await _loadDataFromFirebase();
   }
@@ -240,17 +252,22 @@ class PlayerController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // --- Yükleme ve Renk Yönetimi ---
-
+  // --- YouTube Yükleme Mantığı ---
   Future<void> _loadAndPlay(Music music, {bool autoPlay = true}) async {
     int retryCount = 0;
     const int maxRetries = 3;
     bool success = false;
 
     while (retryCount < maxRetries && !success) {
+      // Eğer yükleme sırasında başka bir şarkıya basıldıysa bu işlemi iptal et
+      if (_loadingVideoId != music.youtubeId) return;
+
       try {
         final streamUrl = await _musicService.getAudioStreamUrl(music.youtubeId);
         if (streamUrl == null || streamUrl.isEmpty) throw Exception("No URL");
+
+        // Tekrar kontrol et
+        if (_loadingVideoId != music.youtubeId) return;
 
         final item = MediaItem(
           id: music.youtubeId,
@@ -262,15 +279,21 @@ class PlayerController extends ChangeNotifier {
 
         final handler = _audioHandler as MyAudioHandler;
         await handler.setAudioSource(streamUrl, item);
-        if (autoPlay) await _audioHandler.play();
+        
+        if (autoPlay && _loadingVideoId == music.youtubeId) {
+          await _audioHandler.play();
+        }
         success = true;
       } catch (e) {
         retryCount++;
         if (retryCount < maxRetries) await Future.delayed(Duration(milliseconds: 500));
       }
     }
-    isPlayerReady = true;
-    notifyListeners();
+    
+    if (_loadingVideoId == music.youtubeId) {
+      isPlayerReady = true;
+      notifyListeners();
+    }
   }
 
   Future<void> _updateDominantColor(String imageUrl) async {
