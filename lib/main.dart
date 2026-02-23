@@ -40,6 +40,7 @@ Future<void> main() async {
 
   // ✅ 3. KURAL: Servisleri doğru sırayla ve güvenli tiplerle kaydediyoruz
   getIt.registerSingleton<AudioHandler>(myAudioHandler);
+  getIt.registerSingleton<MyAudioHandler>(myAudioHandler);
   
   final musicService = MusicService();
   getIt.registerSingleton<MusicService>(musicService);

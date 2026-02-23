@@ -1,30 +1,22 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:muzik/main.dart';
+import 'package:muzik/models/music.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MainApp()); // ✅ DÜZELTME: MyApp -> MainApp
+  test('Music model fromMap test', () {
+    final map = {
+      'name': 'Test Song',
+      'image': 'https://example.com/image.jpg',
+      'desc': 'Test Artist',
+      'youtubeId': 'abc123',
+      'durationMs': 180000,
+    };
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    final music = Music.fromMap(map);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(music.name, 'Test Song');
+    expect(music.image, 'https://example.com/image.jpg');
+    expect(music.desc, 'Test Artist');
+    expect(music.youtubeId, 'abc123');
+    expect(music.duration?.inMilliseconds, 180000);
   });
 }

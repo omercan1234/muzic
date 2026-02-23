@@ -37,6 +37,8 @@ class MyAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   @override
   Future<void> stop() => _player.stop();
 
+  Future<void> setVolume(double volume) => _player.setVolume(volume);
+
   Future<void> setAudioSource(String url, MediaItem item) async {
     try {
       final duration = await _player.setAudioSource(
