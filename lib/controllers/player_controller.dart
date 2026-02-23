@@ -9,10 +9,13 @@ import 'package:get_it/get_it.dart';
 import 'package:audio_service/audio_service.dart';
 import '../services/audio_handler.dart';
 import '../services/music_service.dart';
+import 'package:muzik/services/voice_assistant_service.dart';
+import 'package:muzik/models/voice_intent.dart';
 import 'jam_controller.dart';
 
 class PlayerController extends ChangeNotifier {
-  final AudioHandler _audioHandler = GetIt.instance<AudioHandler>();
+  final VoiceAssistantService _voiceAssistantService = VoiceAssistantService();
+  final MyAudioHandler _audioHandler = GetIt.instance<MyAudioHandler>();
   final MusicService _musicService = MusicService();
   
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -118,6 +121,75 @@ class PlayerController extends ChangeNotifier {
 
   void toggleShuffle() { if (!_canControlMusic()) return; isShuffle = !isShuffle; notifyListeners(); }
   void toggleRepeat() { if (!_canControlMusic()) return; isRepeat = !isRepeat; notifyListeners(); }
+
+  void handleVoiceCommand(String command) async {
+    final intent = _voiceAssistantService.processCommand(command);
+
+    switch (intent.intent) {
+      case IntentType.PLAY:
+        if (!isPlaying) togglePlayPause();
+        break;
+      case IntentType.PAUSE:
+        if (isPlaying) togglePlayPause();
+        break;
+      case IntentType.NEXT:
+        nextMusic();
+        break;
+      case IntentType.PREVIOUS:
+        previousMusic();
+        break;
+      case IntentType.SEEK_FORWARD:
+        seekForward(intent.seconds ?? 10);
+        break;
+      case IntentType.SEEK_BACKWARD:
+        seekBackward(intent.seconds ?? 10);
+        break;
+      case IntentType.PLAY_SONG:
+        if (intent.songName != null) {
+          final results = await _musicService.searchMusic(intent.songName!);
+          if (results.isNotEmpty) {
+            final firstResult = results.first;
+            onMusicSelect(Music(
+              name: firstResult.title,
+              image: 'https://img.youtube.com/vi/${firstResult.videoId}/0.jpg',
+              desc: firstResult.uploader,
+              youtubeId: firstResult.videoId,
+              duration: Duration(seconds: firstResult.duration),
+            ));
+          }
+        }
+        break;
+      case IntentType.VOLUME_UP:
+        setMusicVolume((musicVolume + 10).clamp(0, 100));
+        break;
+      case IntentType.VOLUME_DOWN:
+        setMusicVolume((musicVolume - 10).clamp(0, 100));
+        break;
+      case IntentType.SET_VOLUME:
+        if (intent.volume != null) {
+          setMusicVolume(intent.volume!.toDouble());
+        }
+        break;
+      case IntentType.UNKNOWN:
+        break;
+    }
+  }
+
+  void setMusicVolume(double volume) {
+    musicVolume = volume;
+    _audioHandler.setVolume(volume / 100);
+    notifyListeners();
+  }
+
+  void seekForward(int seconds) {
+    final currentPos = _audioHandler.playbackState.value.position;
+    _audioHandler.seek(currentPos + Duration(seconds: seconds));
+  }
+
+  void seekBackward(int seconds) {
+    final currentPos = _audioHandler.playbackState.value.position;
+    _audioHandler.seek(currentPos - Duration(seconds: seconds));
+  }
 
   // --- Eksik Metodlar ---
 
@@ -277,8 +349,7 @@ class PlayerController extends ChangeNotifier {
           artUri: music.image.isNotEmpty ? Uri.parse(music.image) : null,
         );
 
-        final handler = _audioHandler as MyAudioHandler;
-        await handler.setAudioSource(streamUrl, item);
+        await _audioHandler.setAudioSource(streamUrl, item);
         
         if (autoPlay && _loadingVideoId == music.youtubeId) {
           await _audioHandler.play();
